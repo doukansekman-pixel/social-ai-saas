@@ -249,32 +249,4 @@ export async function publishPostToInstagram(postId: string) {
   return res.json();
 }
 
-export async function generateChatgptImage(postId: string) {
-  const res = await apiFetch(`/poster/chatgpt-image/${postId}`, {
-    method: "POST",
-  });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.message || "ChatGPT gorsel uretimi basarisiz");
-  }
-
-  return res.json();
-}
-
-export async function reviseChatgptImage(postId: string, instruction: string) {
-  const res = await apiFetch(`/poster/chatgpt-revise/${postId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ instruction }),
-  });
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.message || "ChatGPT gorsel duzeltme basarisiz");
-  }
-
-  return res.json();
-}

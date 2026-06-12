@@ -12,7 +12,6 @@ export default function AdminLayout({ title, subtitle, children }: Props) {
     ["Bayiler", "/dealers"],
     ["Instagram", "/instagram"],
     ["AI Studio", "/ai-post"],
-    ["ChatGPT Gorsel", "/chatgpt-image"],
     ["Takvim", "/schedule"],
     ["Ayarlar", "/settings"],
   ];

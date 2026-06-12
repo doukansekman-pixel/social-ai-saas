@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { getPosts, PostItem, reviseChatgptImage, publishPostToInstagram } from "@/lib/api";
+import { getPosts, PostItem, revisePostImage, publishPostToInstagram } from "@/lib/api";
 
 const API_URL = "https://api.socialai-network.com";
 const PAGE_SIZE = 8;
@@ -31,7 +31,7 @@ export default function SchedulePage() {
       return;
     }
 
-    await reviseChatgptImage(postId, revision);
+    await revisePostImage(postId, revision);
     setRevision("");
     setRevisingId(null);
     await load();

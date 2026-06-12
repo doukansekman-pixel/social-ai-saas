@@ -125,7 +125,7 @@ Oran yazma.
 Bonus yazma.
 Promosyon rakamı yazma.
 Para ödülü yazma.`;
-                        window.location.href = `/chatgpt-image?prompt=${encodeURIComponent(prompt)}`;
+                        window.location.href = `/ai-post?prompt=${encodeURIComponent(prompt)}`;
                       }}
                       className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500"
                     >
