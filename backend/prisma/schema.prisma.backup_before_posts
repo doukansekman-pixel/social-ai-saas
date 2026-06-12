@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  DEALER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+
+  dealerId     String?
+  dealer       Dealer?  @relation(fields: [dealerId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Dealer {
+  id                String   @id @default(cuid())
+  name              String
+  city              String?
+  contactName       String?
+  phone             String?
+  email             String?
+  instagramUsername String?
+  primaryColor      String?
+  isActive          Boolean  @default(true)
+
+  users             User[]
+  instagramAccount  InstagramAccount?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  DEALER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+
+  dealerId     String?
+  dealer       Dealer?  @relation(fields: [dealerId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Dealer {
+  id                String   @id @default(cuid())
+  name              String
+  city              String?
+  contactName       String?
+  phone             String?
+  email             String?
+  instagramUsername String?
+  primaryColor      String?
+  isActive          Boolean  @default(true)
+
+  users             User[]
+  instagramAccount  InstagramAccount?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model InstagramAccount {
+  id                 String   @id @default(cuid())
+
+  dealerId           String   @unique
+  dealer             Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  instagramUsername  String?
+  instagramAccountId String?
+  facebookPageId     String?
+  accessToken        String?
+  tokenExpiresAt     DateTime?
+  isConnected        Boolean  @default(false)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

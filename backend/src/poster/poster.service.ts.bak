@@ -1,0 +1,163 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { writeFileSync } from 'fs';
+
+@Injectable()
+export class PosterService {
+  private openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  constructor(private prisma: PrismaService) {}
+
+  private async createImage(postId: string, revisionInstruction?: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { dealer: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const prompt = `
+Create a world-class German sports betting advertisement.
+
+User campaign request:
+${post.title}
+${post.offer}
+${post.designBrief || ''}
+
+Dealer name:
+${post.dealer.name}
+
+${revisionInstruction ? `REVISION REQUEST:\n${revisionInstruction}` : ''}
+
+Creative rules:
+- All visible text must be in German.
+- Do NOT include the dealer/shop name anywhere inside the image.
+- Dealer name is only for caption and hashtags, never printed on the poster.
+- Never print user instructions or prompt text on the image.
+- Only print final advertising copy that belongs on the poster.
+
+CORE VISUAL STYLE:
+- Create a premium German sportsbook Instagram advertisement.
+- The visual identity must be black, dark gray, deep red and white.
+- Use a dramatic Tipico-like / premium sportsbook style, but do not copy any exact existing poster.
+- Both TIPICO and TIPWIN dealers should use the same premium black-red betting style.
+- Make it look like a real paid campaign from a professional German sports betting brand.
+- Use cinematic stadium lighting, smoke, red glow, depth, dramatic contrast and powerful sports photography.
+- Use national flags in the background when teams/countries are mentioned.
+- Make flags look integrated into the atmosphere, not flat stickers.
+- Use premium, bold, modern German advertising typography.
+- Let the AI choose the best professional font style.
+- Avoid cheap flyer fonts, childish fonts, thin fonts or generic template typography.
+
+MANDATORY SPORTSBOOK LAYOUT:
+- Top-left: create a red sportsbook brand-style banner area.
+- If the dealer type is TIPICO, the banner may say “tipico” style text.
+- If the dealer type is TIPWIN, the banner may say “tipwin” style text.
+- If unsure, use a generic red sportsbook-style brand panel without dealer/shop name.
+- Center/top: show match or competition name.
+- Main area: strong emotional player face-off or action composition.
+- Mid/lower section: include a premium feature strip with 3 icon blocks:
+  1. “SICHERE WETTEN”
+  2. “TOP QUOTEN”
+  3. “DEIN SPIEL. DEIN BONUS.”
+- Use clean white/red line icons such as shield, clock, trophy, gift or ball.
+- Bottom: add one strong red CTA button such as “JETZT MITWETTEN!” or “JETZT TIPPEN!”
+- Add subtle legal-looking 18+ footer only if it fits without hurting the design.
+
+BONUS RULE:
+- Create a dedicated bonus box ONLY if the user input explicitly contains a bonus/offer amount or bonus text.
+- Examples that allow a bonus box: “25€ Bonus”, “50 Euro Bonus”, “Gratiswette”, “100% Bonus”, “Willkommensbonus”, “Rabatt”.
+- If the user does NOT mention a concrete bonus or offer, do NOT invent bonus amounts.
+- Never write “100% WETTBONUS” unless the user explicitly asked for it.
+- If bonus exists, create exactly one clean premium red/black bonus box.
+- If no bonus exists, keep only the CTA and feature strip.
+
+CRITICAL MOBILE INSTAGRAM RULES:
+- Design for Instagram mobile feed first.
+- Vertical 4:5 poster composition optimized for phone screen.
+- All important text must stay inside the central safe area.
+- Top 10% and bottom 18% must remain safe margins.
+- No headline, CTA, bonus box, logo, player face or important object may touch the edges.
+- No text should be cropped when opened on Instagram mobile.
+- Use maximum 4 main text blocks total.
+- Keep text short, powerful and readable.
+- Do not overload the poster with too much text.
+- The final image must look perfect on a phone Instagram post.
+
+TEXT RULES:
+- Use short German phrases.
+- Main headline should be emotional and betting-focused.
+- Do not use long paragraphs.
+- Do not use tiny unreadable footer text unless specifically requested.
+- Do not use Turkish text.
+- Do not use English text.
+- No fake addresses.
+- No unrelated brand names.
+- No boring informational flyers.
+- No amateur layout.
+- No random bonus amounts.
+- No dealer/shop name printed on poster.
+
+REFERENCE FEEL:
+- Similar energy to premium black-red German sports betting Instagram posts.
+- Strong match tension.
+- Red brand banner in top-left.
+- Integrated flags in the background.
+- Feature icon strip.
+- Clear CTA button.
+- Clean high-conversion advertising hierarchy.
+
+Goal:
+The poster must make people stop scrolling and want to visit the shop.
+`;
+
+    const result = await this.openai.images.generate({
+      model: 'gpt-image-1',
+      prompt,
+      size: '1024x1536',
+      quality: 'medium',
+    });
+
+    const imageBase64 = result.data?.[0]?.b64_json;
+
+    if (!imageBase64) {
+      throw new Error('Image generation failed');
+    }
+
+    const filename = `${randomUUID()}.png`;
+    const outputPath = join(process.cwd(), 'uploads', 'posts', filename);
+
+    writeFileSync(outputPath, Buffer.from(imageBase64, 'base64'));
+
+    const imageUrl = `/uploads/posts/${filename}`;
+
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: {
+        imagePrompt: prompt,
+        imageUrl,
+      },
+    });
+
+    return {
+      postId: post.id,
+      imageUrl,
+      prompt,
+    };
+  }
+
+  generateAiImageFromPost(postId: string) {
+    return this.createImage(postId);
+  }
+
+  reviseAiImage(postId: string, instruction: string) {
+    return this.createImage(postId, instruction);
+  }
+}

@@ -1,0 +1,119 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { writeFileSync } from 'fs';
+
+@Injectable()
+export class PosterService {
+  private openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  constructor(private prisma: PrismaService) {}
+
+  async generateAiImageFromPost(postId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { dealer: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const posterConcepts = [
+      'World Cup premium event flyer with prize wheel, jersey, trophy, icons and offer boxes',
+      'high-impact sports betting shop poster with multiple promotional sections and dramatic football visuals',
+      'luxury football campaign flyer with red black gold layout, bold headline, prize area, call-to-action and shop branding',
+      'modern German betting shop Instagram poster with jersey, trophy, football, lights, confetti and promotion cards',
+      'premium match night advertisement with player action, live match atmosphere, drink offer, location and strong CTA'
+    ];
+
+    const selectedConcept =
+      posterConcepts[Math.floor(Math.random() * posterConcepts.length)];
+
+    const prompt = `
+Create an AWARD-WINNING German sports betting advertisement.
+
+This is NOT a simple poster.
+This is NOT an informational flyer.
+
+The goal is to stop people scrolling and make them enter the betting shop.
+
+Visual impact is more important than text.
+
+Create a unique premium advertising concept.
+
+Use:
+- cinematic football photography
+- luxury sports marketing style
+- dramatic lighting
+- emotional football atmosphere
+- premium commercial design
+- magazine cover quality
+- large focal point
+- powerful call-to-action
+- premium betting shop campaign energy
+
+Avoid:
+- boring layouts
+- empty space
+- generic poster design
+- repeated trophy + football compositions
+- long text paragraphs
+- small unreadable text
+
+Campaign theme:
+${post.title}
+
+Campaign offer:
+${post.offer}
+
+Location:
+${post.dealer?.city || ''}
+
+IMPORTANT:
+- Create a completely original concept every time.
+- The visual impact is more important than the text.
+- Think like a creative director at a top sports marketing agency.
+- Create a poster that could appear on a professional sports advertising billboard.
+- Use only short German text.
+- Maximum 3 text blocks on the image.
+`;
+    const result = await this.openai.images.generate({
+      model: 'gpt-image-1',
+      prompt,
+      size: '1024x1536',
+      quality: 'medium',
+    });
+
+    const imageBase64 = result.data?.[0]?.b64_json;
+
+    if (!imageBase64) {
+      throw new Error('Image generation failed');
+    }
+
+    const filename = `${randomUUID()}.png`;
+    const outputPath = join(process.cwd(), 'uploads', 'posts', filename);
+
+    writeFileSync(outputPath, Buffer.from(imageBase64, 'base64'));
+
+    const imageUrl = `/uploads/posts/${filename}`;
+
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: {
+        imagePrompt: prompt,
+        imageUrl,
+      },
+    });
+
+    return {
+      postId: post.id,
+      imageUrl,
+      prompt,
+    };
+  }
+}

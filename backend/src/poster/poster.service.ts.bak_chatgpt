@@ -1,0 +1,74 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { writeFileSync } from 'fs';
+
+@Injectable()
+export class PosterService {
+  private openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  constructor(private prisma: PrismaService) {}
+
+  private async createImage(postId: string, revisionInstruction?: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { dealer: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const userPrompt = post.designBrief || post.title || '';
+
+    const prompt = revisionInstruction
+      ? `${userPrompt}\n\n${revisionInstruction}`
+      : `${userPrompt}`;
+
+    const result = await this.openai.images.generate({
+      model: 'gpt-image-1',
+      prompt,
+      size: '1024x1536',
+      quality: 'medium',
+    });
+
+    const imageBase64 = result.data?.[0]?.b64_json;
+
+    if (!imageBase64) {
+      throw new Error('Image generation failed');
+    }
+
+    const filename = `${randomUUID()}.png`;
+    const outputPath = join(process.cwd(), 'uploads', 'posts', filename);
+
+    writeFileSync(outputPath, Buffer.from(imageBase64, 'base64'));
+
+    const imageUrl = `/uploads/posts/${filename}`;
+
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: {
+        imagePrompt: prompt,
+        imageUrl,
+      },
+    });
+
+    return {
+      postId: post.id,
+      imageUrl,
+      prompt,
+    };
+  }
+
+  generateAiImageFromPost(postId: string) {
+    return this.createImage(postId);
+  }
+
+  reviseAiImage(postId: string, instruction: string) {
+    return this.createImage(postId, instruction);
+  }
+}
